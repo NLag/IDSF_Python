@@ -12,7 +12,7 @@ import csv
 
 ###############################################################################
 #dataset folder
-modelfolder = './captured_traffic/'
+modelfolder = './detection_result/'
 
 #feature to extract
 featurenamefile = 'Feature_name.dat'
