@@ -9,13 +9,16 @@ from threading import Thread
 import threading
 from collections import deque
 import csv
+import joblib
+
+ATTACKER_IP = '10.45.0.3'
 
 ###############################################################################
 #dataset folder
 modelfolder = './detection_result/'
 
 #feature to extract
-featurenamefile = 'Feature_name.dat'
+featurenamefile = 'Feature_use_training.dat'
 with open(featurenamefile) as file:
     feature_name = [line.rstrip() for line in file]
 file.close()
@@ -23,11 +26,17 @@ ft_dict = {key: i for i, key in enumerate(feature_name)}
 n_feature = len(feature_name)
 
 # dataset_df = pd.DataFrame(columns=feature_name)
-dataset_deque = deque([])
-has_data_event = threading.Event()
+result_deque = deque([])
+has_result_event = threading.Event()
 
 dtime_str = datetime.now().strftime('%d-%m-%Y_%H%M')
-csvfile = modelfolder + 'captured_dataset_'+dtime_str+'.csv'
+csvfile = modelfolder + 'result'+dtime_str+'.csv'
+
+# AI model
+modelfile = 'IDSF_model'
+filetype = '.joblib'
+filename = modelfile + '_SGDC' + filetype
+loaded_model = joblib.load(filename)
 
 #stop signal and stop ack
 STOP_CAPTURE = False
@@ -37,15 +46,22 @@ pk_count = 0
 
 ###############################################################################
 
+def use_AI_model_detect_single_row(lstX):
+    global loaded_model
+    global feature_name
+    Xdf = pd.DataFrame([lstX],columns=feature_name)
+    lstY = loaded_model.predict(Xdf)
+    return lstY[0]
+
 #packet to list
 def packet_to_lists(pk,time_start,time_previous,time_now):
     '''process packet and put to queue'''
     global feature_name
     global n_feature
-    global dataset_deque
-    global has_data_event
-    pk_lst = []
-    ft_lst = [None] * n_feature
+    global result_deque
+    global has_result_event
+    res_lst = []
+    ft_lst = [0] * n_feature
     ft_lst[ft_dict['frame.time_delta']]=time_now-time_previous
     ft_lst[ft_dict['frame.time_relative']]=time_now-time_start
     #IP
@@ -54,9 +70,10 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
     # 'src', 'addr', 'src_host', 'host', 'dst', 'dst_host']
     #pk.ip.version.int_value
     ft_lst[ft_dict['ip.len']]=pk.ip.len.hex_value
-    ft_lst[ft_dict['ip.protocol']]=pk.ip.proto.hex_value
-    ft_lst[ft_dict['ip.src']]=pk.ip.src.show
-    ft_lst[ft_dict['ip.dst']]=pk.ip.dst.show
+    # ft_lst[ft_dict['ip.protocol']]=pk.ip.proto.hex_value
+    ipsrc_str=pk.ip.src.show
+    true_r = 1 if ipsrc_str == ATTACKER_IP else 0
+    # ft_lst[ft_dict['ip.dst']]=pk.ip.dst.show
     #TCP
     #['srcport', 'dstport', 'port', 'stream', 'len', 'seq', 'seq_raw', 'nxtseq', 'ack', 'ack_raw',
     #  'hdr_len', 'flags', 'flags_res', 'flags_ns', 'flags_cwr', 'flags_ecn', 'flags_urg', 'flags_ack', 
@@ -72,7 +89,8 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
     ft_lst[ft_dict['tcp.time_relative']]=float(pk.tcp.time_relative)
     ft_lst[ft_dict['tcp.time_delta']]=float(pk.tcp.time_delta)
     if ("MQTT" not in pk):
-        dataset_deque.append(ft_lst)
+        detect_r = use_AI_model_detect_single_row(ft_lst)
+        result_deque.append((true_r,detect_r))
         return 0
     
     #MQTT
@@ -87,7 +105,8 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
         new_ft_lst[ft_dict['mqtt.msgtype']]=int(mqtt.msgtype)
         new_ft_lst[ft_dict['mqtt.len']]=int(mqtt.len)
         if len(mqtt.field_names) == 4:
-            pk_lst.append(new_ft_lst)
+            detect_r = use_AI_model_detect_single_row(new_ft_lst)
+            res_lst.append((true_r,detect_r))
             continue
         if new_ft_lst[ft_dict['mqtt.msgtype']] == 1:
             #MQTT CONNECT
@@ -96,7 +115,7 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
             # 'kalive', 'clientid_len', 'clientid', 'willtopic_len', 'willtopic', 'willmsg_len', 'willmsg'
             # , 'username_len', 'username', 'passwd_len', 'passwd']
             new_ft_lst[ft_dict['mqtt.proto_len']]=int(mqtt.proto_len)
-            new_ft_lst[ft_dict['mqtt.protoname']]=str(mqtt.protoname)
+            new_ft_lst[ft_dict['mqtt.protoname']]=1 if 'MQTT' in str(mqtt.protoname) else 0
             new_ft_lst[ft_dict['mqtt.ver']]=int(mqtt.ver)
             new_ft_lst[ft_dict['mqtt.conflags']]=mqtt.conflags.hex_value
             new_ft_lst[ft_dict['mqtt.conflag.uname']]= int(mqtt.conflag_uname)
@@ -108,23 +127,23 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
             new_ft_lst[ft_dict['mqtt.conflag.reserved']]=int(mqtt.conflag_reserved)
             new_ft_lst[ft_dict['mqtt.kalive']]=mqtt.kalive.hex_value
             new_ft_lst[ft_dict['mqtt.clientid_len']]=int(mqtt.clientid_len)
-            if new_ft_lst[ft_dict['mqtt.clientid_len']] > 0:
-                new_ft_lst[ft_dict['mqtt.clientid']] = str(mqtt.clientid)
+            # if new_ft_lst[ft_dict['mqtt.clientid_len']] > 0:
+            #     new_ft_lst[ft_dict['mqtt.clientid']] = str(mqtt.clientid)
             if new_ft_lst[ft_dict['mqtt.conflag.willflag']] == 1:
                 new_ft_lst[ft_dict['mqtt.willtopic_len']]=int(mqtt.willtopic_len)
-                if new_ft_lst[ft_dict['mqtt.willtopic_len']]>0:
-                    new_ft_lst[ft_dict['mqtt.willtopic']]=str(mqtt.willtopic)
+                # if new_ft_lst[ft_dict['mqtt.willtopic_len']]>0:
+                #     new_ft_lst[ft_dict['mqtt.willtopic']]=str(mqtt.willtopic)
                 new_ft_lst[ft_dict['mqtt.willmsg_len']]=int(mqtt.willmsg_len)
-                if new_ft_lst[ft_dict['mqtt.willmsg_len']]>0:
-                    new_ft_lst[ft_dict['mqtt.willmsg']]=str(mqtt.willmsg)
+                # if new_ft_lst[ft_dict['mqtt.willmsg_len']]>0:
+                #     new_ft_lst[ft_dict['mqtt.willmsg']]=str(mqtt.willmsg)
             if new_ft_lst[ft_dict['mqtt.conflag.uname']] == 1:
                 new_ft_lst[ft_dict['mqtt.username_len']]=int(mqtt.username_len)
-                if new_ft_lst[ft_dict['mqtt.username_len']]>0:
-                    new_ft_lst[ft_dict['mqtt.username']]=str(mqtt.username)
+                # if new_ft_lst[ft_dict['mqtt.username_len']]>0:
+                #     new_ft_lst[ft_dict['mqtt.username']]=str(mqtt.username)
             if new_ft_lst[ft_dict['mqtt.conflag.passwd']] == 1:
                 new_ft_lst[ft_dict['mqtt.passwd_len']]=int(mqtt.passwd_len)
-                if new_ft_lst[ft_dict['mqtt.passwd_len']]>0:
-                    new_ft_lst[ft_dict['mqtt.passwd']]=str(mqtt.passwd)
+                # if new_ft_lst[ft_dict['mqtt.passwd_len']]>0:
+                #     new_ft_lst[ft_dict['mqtt.passwd']]=str(mqtt.passwd)
 
         elif new_ft_lst[ft_dict['mqtt.msgtype']] == 2:
             #MQTT CONACK
@@ -142,65 +161,67 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
             new_ft_lst[ft_dict['mqtt.qos']]=int(mqtt.qos)
             new_ft_lst[ft_dict['mqtt.retain']]=int(mqtt.retain)
             new_ft_lst[ft_dict['mqtt.topic_len']]=int(mqtt.topic_len)
-            if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
-                    new_ft_lst[ft_dict['mqtt.topic_len']] < new_ft_lst[ft_dict['mqtt.len']] and \
-                    'topic' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
+            # if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
+            #         new_ft_lst[ft_dict['mqtt.topic_len']] < new_ft_lst[ft_dict['mqtt.len']] and \
+            #         'topic' in mqtt.field_names:
+            #     new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
             msgid_len = 0
             if new_ft_lst[ft_dict['mqtt.qos']] != 0 and \
                     'msgid' in mqtt.field_names:
                 msgid_len = 2
-                new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
+                # new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
             msglen = new_ft_lst[ft_dict['mqtt.len']] - 2 - new_ft_lst[ft_dict['mqtt.topic_len']] - msgid_len
             if msglen > 0:
                 new_ft_lst[ft_dict['mqtt.msglen']] = msglen
-                if  'msg' in mqtt.field_names:
-                    new_ft_lst[ft_dict['mqtt.msg']] = str(mqtt.msg)
+                # if  'msg' in mqtt.field_names:
+                #     new_ft_lst[ft_dict['mqtt.msg']] = str(mqtt.msg)
             else:
                 new_ft_lst[ft_dict['mqtt.msglen']] = 0
             
-        elif new_ft_lst[ft_dict['mqtt.msgtype']] in [4,5,6,7,11]:
+        # elif new_ft_lst[ft_dict['mqtt.msgtype']] in [4,5,6,7,11]:
             #MQTT PUBACK, PUBREC, PUBREL, PUBCOMP, UNSUBACK
             #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid']
-            if 'msgid' in mqtt.field_names :
-                new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
+            # if 'msgid' in mqtt.field_names :
+            #     new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
 
         elif new_ft_lst[ft_dict['mqtt.msgtype']] == 8:
             #MQTT SUBSCRIBE
             #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid', 'topic_len', 'topic', 'sub_qos']
-            if 'msgid' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
+            # if 'msgid' in mqtt.field_names:
+            #     new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
             new_ft_lst[ft_dict['mqtt.topic_len']]=int(mqtt.topic_len)
-            if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
-                    'topic' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
+            # if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
+            #         'topic' in mqtt.field_names:
+            #     new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
             new_ft_lst[ft_dict['mqtt.sub.qos']] = int(mqtt.sub_qos)
             
         elif new_ft_lst[ft_dict['mqtt.msgtype']] == 9:
             #MQTT SUBACK
             #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid', 'suback_qos']
-            if 'msgid' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
+            # if 'msgid' in mqtt.field_names:
+            #     new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
             new_ft_lst[ft_dict['mqtt.suback.qos']] = int(mqtt.suback_qos)
 
         elif new_ft_lst[ft_dict['mqtt.msgtype']] == 10:
             print(mqtt.field_names)
             #MQTT UNSUBSCRIBE       
             # ['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid', 'topic_len', 'topic']
-            if 'msgid' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
+            # if 'msgid' in mqtt.field_names:
+            #     new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
             new_ft_lst[ft_dict['mqtt.topic_len']]=int(mqtt.topic_len)
-            if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
-                    'topic' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
+            # if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
+            #         'topic' in mqtt.field_names:
+            #     new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
     
         # elif new_ft_lst[ft_dict['mqtt.msgtype']] in [12,13,14]:
             #MQTT PINGREQ, PINGRESP, DISCONNECT
         # else:
         #     #pk_lstMQTT Reserved
-        pk_lst.append(new_ft_lst)
-    dataset_deque.extend(pk_lst)
-    has_data_event.set()
+
+        detect_r = use_AI_model_detect_single_row(new_ft_lst)
+        res_lst.append((true_r,detect_r))
+    result_deque.extend(res_lst)
+    has_result_event.set()
 
 ###############################################################################
 
@@ -218,21 +239,21 @@ def signal_handler(*args):
         
         global STOP_OUTPUT
         STOP_OUTPUT=True
-        global has_data_event
-        has_data_event.set()
+        global has_result_event
+        has_result_event.set()
         print('wait output thread to finish')
         global out_thrd
         out_thrd.join()
 
         # dump data if exist
-        if len(dataset_deque) > 0:
+        if len(result_deque) > 0:
             global csvfile
-            n = len(dataset_deque)
-            rows = [dataset_deque.popleft() for i in range(n)]
+            n = len(result_deque)
+            rows = [result_deque.popleft() for i in range(n)]
             with open(csvfile,'a') as f:
                 writer = csv.writer(f)
                 writer.writerows(rows)
-            print('dumped last rows',n)
+            print('dumped last rows:',n)
 
         global pk_count
         print("total:",pk_count," packet")
@@ -243,13 +264,13 @@ signal.signal(signal.SIGINT, signal_handler)
 ###############################################################################
 
 def write_queue_to_file(filename):
-    global dataset_deque
-    global has_data_event
+    global result_deque
+    global has_result_event
     while STOP_OUTPUT==False:
-        has_data_event.wait()
-        n = len(dataset_deque)
-        rows = [dataset_deque.popleft() for i in range(n)]
-        has_data_event.clear()
+        has_result_event.wait()
+        n = len(result_deque)
+        rows = [result_deque.popleft() for i in range(n)]
+        has_result_event.clear()
         with open(filename,'a') as f:
             writer = csv.writer(f)
             writer.writerows(rows)
@@ -277,11 +298,11 @@ def capture_live_packets(network_interface):
             break
         pk_count+=1
         if pk_count % 1000 == 0:
-            print(pk_count,"packets recorded")
+            print(pk_count,"packets tested")
 
 print('Start Output thread')
 out_thrd = Thread(target=write_queue_to_file,args=(csvfile,),daemon=True,name='Output')
 out_thrd.start()
 
-print('Start pyshark sniff continuously')
+print('Start pyshark sniff and detect')
 capture_live_packets('ogstun')

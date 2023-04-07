@@ -57,6 +57,9 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
     ft_lst[ft_dict['ip.protocol']]=pk.ip.proto.hex_value
     ft_lst[ft_dict['ip.src']]=pk.ip.src.show
     ft_lst[ft_dict['ip.dst']]=pk.ip.dst.show
+    global ATTACKER_IP
+    if ft_lst[ft_dict['ip.src']] == ATTACKER_IP:
+        ft_lst[ft_dict['label']]=1
     #TCP
     #['srcport', 'dstport', 'port', 'stream', 'len', 'seq', 'seq_raw', 'nxtseq', 'ack', 'ack_raw',
     #  'hdr_len', 'flags', 'flags_res', 'flags_ns', 'flags_cwr', 'flags_ecn', 'flags_urg', 'flags_ack', 
