@@ -6,7 +6,9 @@ ip.src
 ip.dst
 tcp.srcport
 tcp.dstport
-tcp.flags
+tcp.time_relative
+tcp.time_delta
+mqtt.num
 mqtt.hdrflags
 mqtt.msgtype
 mqtt.dupflag
@@ -44,5 +46,5 @@ mqtt.msgid
 mqtt.msglen
 mqtt.msg
 mqtt.sub.qos
-mqtt.suback.retcode
+mqtt.suback.qos
 label
