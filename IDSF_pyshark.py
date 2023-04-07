@@ -10,6 +10,8 @@ import threading
 from collections import deque
 import csv
 
+ATTACKER_IP = '10.45.0.3'
+
 ###############################################################################
 #dataset folder
 modelfolder = './captured_traffic/'
@@ -177,7 +179,8 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
             if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
                     'topic' in mqtt.field_names:
                 new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
-            new_ft_lst[ft_dict['mqtt.sub.qos']] = int(mqtt.sub_qos)
+            if 'sub_qos' in mqtt.field_names:
+                new_ft_lst[ft_dict['mqtt.sub.qos']] = int(mqtt.sub_qos)
             
         elif new_ft_lst[ft_dict['mqtt.msgtype']] == 9:
             #MQTT SUBACK

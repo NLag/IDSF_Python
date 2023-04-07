@@ -74,6 +74,8 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
     ipsrc_str=pk.ip.src.show
     true_r = 1 if ipsrc_str == ATTACKER_IP else 0
     # ft_lst[ft_dict['ip.dst']]=pk.ip.dst.show
+    if pk.ip.proto.hex_value != 6:
+        return 0
     #TCP
     #['srcport', 'dstport', 'port', 'stream', 'len', 'seq', 'seq_raw', 'nxtseq', 'ack', 'ack_raw',
     #  'hdr_len', 'flags', 'flags_res', 'flags_ns', 'flags_cwr', 'flags_ecn', 'flags_urg', 'flags_ack', 
@@ -193,7 +195,8 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
             # if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
             #         'topic' in mqtt.field_names:
             #     new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
-            new_ft_lst[ft_dict['mqtt.sub.qos']] = int(mqtt.sub_qos)
+            if 'sub_qos' in mqtt.field_names:
+                new_ft_lst[ft_dict['mqtt.sub.qos']] = int(mqtt.sub_qos)
             
         elif new_ft_lst[ft_dict['mqtt.msgtype']] == 9:
             #MQTT SUBACK
