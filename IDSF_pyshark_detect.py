@@ -30,13 +30,15 @@ result_deque = deque([])
 has_result_event = threading.Event()
 
 dtime_str = datetime.now().strftime('%d-%m-%Y_%H%M')
-csvfile = modelfolder + 'result'+dtime_str+'.csv'
 
 # AI model
 modelfile = 'IDSF_model'
 filetype = '.joblib'
-filename = modelfile + '_SGDC' + filetype
+modelname = 'DT'
+filename = modelfile + '_'+ modelname + filetype
 loaded_model = joblib.load(filename)
+
+csvfile = modelfolder +'_'+modelname+'_' +'result'+dtime_str+'.csv'
 
 #stop signal and stop ack
 STOP_CAPTURE = False
