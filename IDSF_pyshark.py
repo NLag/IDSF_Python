@@ -62,6 +62,8 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
     global ATTACKER_IP
     if ft_lst[ft_dict['ip.src']] == ATTACKER_IP:
         ft_lst[ft_dict['label']]=1
+    else:
+        ft_lst[ft_dict['label']]=0
     #TCP
     #['srcport', 'dstport', 'port', 'stream', 'len', 'seq', 'seq_raw', 'nxtseq', 'ack', 'ack_raw',
     #  'hdr_len', 'flags', 'flags_res', 'flags_ns', 'flags_cwr', 'flags_ecn', 'flags_urg', 'flags_ack', 
@@ -94,117 +96,129 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
         if len(mqtt.field_names) == 4:
             pk_lst.append(new_ft_lst)
             continue
-        if new_ft_lst[ft_dict['mqtt.msgtype']] == 1:
-            #MQTT CONNECT
-            #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'proto_len', 'protoname', 'ver', 'conflags', 'conflag_uname', 
-            # 'conflag_passwd', 'conflag_retain', 'conflag_qos', 'conflag_willflag', 'conflag_cleansess', 'conflag_reserved', 
-            # 'kalive', 'clientid_len', 'clientid', 'willtopic_len', 'willtopic', 'willmsg_len', 'willmsg'
-            # , 'username_len', 'username', 'passwd_len', 'passwd']
-            new_ft_lst[ft_dict['mqtt.proto_len']]=int(mqtt.proto_len)
-            new_ft_lst[ft_dict['mqtt.protoname']]=str(mqtt.protoname)
-            new_ft_lst[ft_dict['mqtt.ver']]=int(mqtt.ver)
-            new_ft_lst[ft_dict['mqtt.conflags']]=mqtt.conflags.hex_value
-            new_ft_lst[ft_dict['mqtt.conflag.uname']]= int(mqtt.conflag_uname)
-            new_ft_lst[ft_dict['mqtt.conflag.passwd']]=int(mqtt.conflag_passwd)
-            new_ft_lst[ft_dict['mqtt.conflag.willretain']]=int(mqtt.conflag_retain)
-            new_ft_lst[ft_dict['mqtt.conflag.willqos']]=int(mqtt.conflag_qos)
-            new_ft_lst[ft_dict['mqtt.conflag.willflag']]=int(mqtt.conflag_willflag)
-            new_ft_lst[ft_dict['mqtt.conflag.cleansess']]=int(mqtt.conflag_cleansess)
-            new_ft_lst[ft_dict['mqtt.conflag.reserved']]=int(mqtt.conflag_reserved)
-            new_ft_lst[ft_dict['mqtt.kalive']]=mqtt.kalive.hex_value
-            new_ft_lst[ft_dict['mqtt.clientid_len']]=int(mqtt.clientid_len)
-            if new_ft_lst[ft_dict['mqtt.clientid_len']] > 0:
-                new_ft_lst[ft_dict['mqtt.clientid']] = str(mqtt.clientid)
-            if new_ft_lst[ft_dict['mqtt.conflag.willflag']] == 1:
-                new_ft_lst[ft_dict['mqtt.willtopic_len']]=int(mqtt.willtopic_len)
-                if new_ft_lst[ft_dict['mqtt.willtopic_len']]>0:
-                    new_ft_lst[ft_dict['mqtt.willtopic']]=str(mqtt.willtopic)
-                new_ft_lst[ft_dict['mqtt.willmsg_len']]=int(mqtt.willmsg_len)
-                if new_ft_lst[ft_dict['mqtt.willmsg_len']]>0:
-                    new_ft_lst[ft_dict['mqtt.willmsg']]=str(mqtt.willmsg)
-            if new_ft_lst[ft_dict['mqtt.conflag.uname']] == 1:
-                new_ft_lst[ft_dict['mqtt.username_len']]=int(mqtt.username_len)
-                if new_ft_lst[ft_dict['mqtt.username_len']]>0:
-                    new_ft_lst[ft_dict['mqtt.username']]=str(mqtt.username)
-            if new_ft_lst[ft_dict['mqtt.conflag.passwd']] == 1:
-                new_ft_lst[ft_dict['mqtt.passwd_len']]=int(mqtt.passwd_len)
-                if new_ft_lst[ft_dict['mqtt.passwd_len']]>0:
-                    new_ft_lst[ft_dict['mqtt.passwd']]=str(mqtt.passwd)
+        try:
+            if new_ft_lst[ft_dict['mqtt.msgtype']] == 1:
+                #MQTT CONNECT
+                #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'proto_len', 'protoname', 'ver', 'conflags', 'conflag_uname', 
+                # 'conflag_passwd', 'conflag_retain', 'conflag_qos', 'conflag_willflag', 'conflag_cleansess', 'conflag_reserved', 
+                # 'kalive', 'clientid_len', 'clientid', 'willtopic_len', 'willtopic', 'willmsg_len', 'willmsg'
+                # , 'username_len', 'username', 'passwd_len', 'passwd']
+                new_ft_lst[ft_dict['mqtt.proto_len']]=int(mqtt.proto_len)
+                if new_ft_lst[ft_dict['mqtt.proto_len']] > new_ft_lst[ft_dict['mqtt.len']]:
+                    pk_lst.append(new_ft_lst)
+                    continue
+                new_ft_lst[ft_dict['mqtt.protoname']]=str(mqtt.protoname)
+                new_ft_lst[ft_dict['mqtt.ver']]=int(mqtt.ver)
+                new_ft_lst[ft_dict['mqtt.conflags']]=mqtt.conflags.hex_value
+                new_ft_lst[ft_dict['mqtt.conflag.uname']]= int(mqtt.conflag_uname)
+                new_ft_lst[ft_dict['mqtt.conflag.passwd']]=int(mqtt.conflag_passwd)
+                new_ft_lst[ft_dict['mqtt.conflag.willretain']]=int(mqtt.conflag_retain)
+                new_ft_lst[ft_dict['mqtt.conflag.willqos']]=int(mqtt.conflag_qos)
+                new_ft_lst[ft_dict['mqtt.conflag.willflag']]=int(mqtt.conflag_willflag)
+                new_ft_lst[ft_dict['mqtt.conflag.cleansess']]=int(mqtt.conflag_cleansess)
+                new_ft_lst[ft_dict['mqtt.conflag.reserved']]=int(mqtt.conflag_reserved)
+                new_ft_lst[ft_dict['mqtt.kalive']]=mqtt.kalive.hex_value
+                new_ft_lst[ft_dict['mqtt.clientid_len']]=int(mqtt.clientid_len)
+                if new_ft_lst[ft_dict['mqtt.clientid_len']] > 0:
+                    new_ft_lst[ft_dict['mqtt.clientid']] = str(mqtt.clientid)
+                if new_ft_lst[ft_dict['mqtt.conflag.willflag']] == 1:
+                    new_ft_lst[ft_dict['mqtt.willtopic_len']]=int(mqtt.willtopic_len)
+                    if new_ft_lst[ft_dict['mqtt.willtopic_len']]>0:
+                        new_ft_lst[ft_dict['mqtt.willtopic']]=str(mqtt.willtopic)
+                    new_ft_lst[ft_dict['mqtt.willmsg_len']]=int(mqtt.willmsg_len)
+                    if new_ft_lst[ft_dict['mqtt.willmsg_len']]>0:
+                        new_ft_lst[ft_dict['mqtt.willmsg']]=str(mqtt.willmsg)
+                if new_ft_lst[ft_dict['mqtt.conflag.uname']] == 1:
+                    new_ft_lst[ft_dict['mqtt.username_len']]=int(mqtt.username_len)
+                    if new_ft_lst[ft_dict['mqtt.username_len']]>0:
+                        new_ft_lst[ft_dict['mqtt.username']]=str(mqtt.username)
+                if new_ft_lst[ft_dict['mqtt.conflag.passwd']] == 1:
+                    new_ft_lst[ft_dict['mqtt.passwd_len']]=int(mqtt.passwd_len)
+                    if new_ft_lst[ft_dict['mqtt.passwd_len']]>0:
+                        new_ft_lst[ft_dict['mqtt.passwd']]=str(mqtt.passwd)
 
-        elif new_ft_lst[ft_dict['mqtt.msgtype']] == 2:
-            #MQTT CONACK
-            # ['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'conack_flags', 'conack_flags_reserved', 
-            #  'conack_flags_sp', 'conack_val']
-            new_ft_lst[ft_dict['mqtt.conack.flags']] = mqtt.conack_flags.hex_value
-            new_ft_lst[ft_dict['mqtt.conact.flags.sp']] = int(mqtt.conack_flags_sp)
-            if 'conack_val' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.conack.val']] = int(mqtt.conack_val)
-            
-        elif new_ft_lst[ft_dict['mqtt.msgtype']] == 3:
-            #MQTT PUBLISH
-            #['hdrflags', 'msgtype', 'dupflag', 'qos', 'retain', 'len', 'topic_len', 'topic', 'msgid', 'msg']
-            new_ft_lst[ft_dict['mqtt.dupflag']]= int(mqtt.dupflag)
-            new_ft_lst[ft_dict['mqtt.qos']]=int(mqtt.qos)
-            new_ft_lst[ft_dict['mqtt.retain']]=int(mqtt.retain)
-            new_ft_lst[ft_dict['mqtt.topic_len']]=int(mqtt.topic_len)
-            if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
-                    new_ft_lst[ft_dict['mqtt.topic_len']] < new_ft_lst[ft_dict['mqtt.len']] and \
-                    'topic' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
-            msgid_len = 0
-            if new_ft_lst[ft_dict['mqtt.qos']] != 0 and \
-                    'msgid' in mqtt.field_names:
-                msgid_len = 2
-                new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
-            msglen = new_ft_lst[ft_dict['mqtt.len']] - 2 - new_ft_lst[ft_dict['mqtt.topic_len']] - msgid_len
-            if msglen > 0:
-                new_ft_lst[ft_dict['mqtt.msglen']] = msglen
-                if  'msg' in mqtt.field_names:
-                    new_ft_lst[ft_dict['mqtt.msg']] = str(mqtt.msg)
-            else:
-                new_ft_lst[ft_dict['mqtt.msglen']] = 0
-            
-        elif new_ft_lst[ft_dict['mqtt.msgtype']] in [4,5,6,7,11]:
-            #MQTT PUBACK, PUBREC, PUBREL, PUBCOMP, UNSUBACK
-            #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid']
-            if 'msgid' in mqtt.field_names :
-                new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
+            elif new_ft_lst[ft_dict['mqtt.msgtype']] == 2:
+                #MQTT CONACK
+                # ['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'conack_flags', 'conack_flags_reserved', 
+                #  'conack_flags_sp', 'conack_val']
+                new_ft_lst[ft_dict['mqtt.conack.flags']] = mqtt.conack_flags.hex_value
+                new_ft_lst[ft_dict['mqtt.conact.flags.sp']] = int(mqtt.conack_flags_sp)
+                if 'conack_val' in mqtt.field_names:
+                    new_ft_lst[ft_dict['mqtt.conack.val']] = int(mqtt.conack_val)
+                
+            elif new_ft_lst[ft_dict['mqtt.msgtype']] == 3:
+                #MQTT PUBLISH
+                #['hdrflags', 'msgtype', 'dupflag', 'qos', 'retain', 'len', 'topic_len', 'topic', 'msgid', 'msg']
+                new_ft_lst[ft_dict['mqtt.dupflag']]= int(mqtt.dupflag)
+                new_ft_lst[ft_dict['mqtt.qos']]=int(mqtt.qos)
+                new_ft_lst[ft_dict['mqtt.retain']]=int(mqtt.retain)
+                new_ft_lst[ft_dict['mqtt.topic_len']]=int(mqtt.topic_len)
+                if new_ft_lst[ft_dict['mqtt.topic_len']] > new_ft_lst[ft_dict['mqtt.len']]:
+                    pk_lst.append(new_ft_lst)
+                    continue
+                elif new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and 'topic' in mqtt.field_names:
+                    new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
+                    
+                msgid_len = 0
+                if new_ft_lst[ft_dict['mqtt.qos']] != 0 and \
+                        'msgid' in mqtt.field_names:
+                    msgid_len = 2
+                    new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
+                msglen = new_ft_lst[ft_dict['mqtt.len']] - 2 - new_ft_lst[ft_dict['mqtt.topic_len']] - msgid_len
+                if msglen > 0:
+                    new_ft_lst[ft_dict['mqtt.msglen']] = msglen
+                    if  'msg' in mqtt.field_names:
+                        new_ft_lst[ft_dict['mqtt.msg']] = str(mqtt.msg)
+                else:
+                    new_ft_lst[ft_dict['mqtt.msglen']] = 0
+                
+            elif new_ft_lst[ft_dict['mqtt.msgtype']] in [4,5,6,7,11]:
+                #MQTT PUBACK, PUBREC, PUBREL, PUBCOMP, UNSUBACK
+                #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid']
+                if 'msgid' in mqtt.field_names :
+                    new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
 
-        elif new_ft_lst[ft_dict['mqtt.msgtype']] == 8:
-            #MQTT SUBSCRIBE
-            #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid', 'topic_len', 'topic', 'sub_qos']
-            if 'msgid' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
-            new_ft_lst[ft_dict['mqtt.topic_len']]=int(mqtt.topic_len)
-            if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
-                    'topic' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
-            if 'sub_qos' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.sub.qos']] = int(mqtt.sub_qos)
-            
-        elif new_ft_lst[ft_dict['mqtt.msgtype']] == 9:
-            #MQTT SUBACK
-            #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid', 'suback_qos']
-            if 'msgid' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
-            new_ft_lst[ft_dict['mqtt.suback.qos']] = int(mqtt.suback_qos)
+            elif new_ft_lst[ft_dict['mqtt.msgtype']] == 8:
+                #MQTT SUBSCRIBE
+                #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid', 'topic_len', 'topic', 'sub_qos']
+                if 'msgid' in mqtt.field_names:
+                    new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
+                new_ft_lst[ft_dict['mqtt.topic_len']]=int(mqtt.topic_len)
+                if new_ft_lst[ft_dict['mqtt.topic_len']] > new_ft_lst[ft_dict['mqtt.len']]:
+                    pk_lst.append(new_ft_lst)
+                    continue
+                elif new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and 'topic' in mqtt.field_names:
+                    new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
+                if 'sub_qos' in mqtt.field_names:
+                    new_ft_lst[ft_dict['mqtt.sub.qos']] = int(mqtt.sub_qos)
+                
+            elif new_ft_lst[ft_dict['mqtt.msgtype']] == 9:
+                #MQTT SUBACK
+                #['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid', 'suback_qos']
+                if 'msgid' in mqtt.field_names:
+                    new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
+                new_ft_lst[ft_dict['mqtt.suback.qos']] = int(mqtt.suback_qos)
 
-        elif new_ft_lst[ft_dict['mqtt.msgtype']] == 10:
+            elif new_ft_lst[ft_dict['mqtt.msgtype']] == 10:
+                #MQTT UNSUBSCRIBE       
+                # ['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid', 'topic_len', 'topic']
+                if 'msgid' in mqtt.field_names:
+                    new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
+                new_ft_lst[ft_dict['mqtt.topic_len']]=int(mqtt.topic_len)
+                if new_ft_lst[ft_dict['mqtt.topic_len']] > new_ft_lst[ft_dict['mqtt.len']]:
+                    pk_lst.append(new_ft_lst)
+                    continue
+                elif new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and 'topic' in mqtt.field_names:
+                    new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
+        
+            # elif new_ft_lst[ft_dict['mqtt.msgtype']] in [12,13,14]:
+                #MQTT PINGREQ, PINGRESP, DISCONNECT
+            # else:
+            #     #pk_lstMQTT Reserved
+            pk_lst.append(new_ft_lst)
+        except:
+            traceback.print_exc()
             print(mqtt.field_names)
-            #MQTT UNSUBSCRIBE       
-            # ['hdrflags', 'msgtype', 'hdr_reserved', 'len', 'msgid', 'topic_len', 'topic']
-            if 'msgid' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.msgid']]=int(mqtt.msgid)
-            new_ft_lst[ft_dict['mqtt.topic_len']]=int(mqtt.topic_len)
-            if new_ft_lst[ft_dict['mqtt.topic_len']] > 0 and \
-                    'topic' in mqtt.field_names:
-                new_ft_lst[ft_dict['mqtt.topic']]=str(mqtt.topic)
-    
-        # elif new_ft_lst[ft_dict['mqtt.msgtype']] in [12,13,14]:
-            #MQTT PINGREQ, PINGRESP, DISCONNECT
-        # else:
-        #     #pk_lstMQTT Reserved
-        pk_lst.append(new_ft_lst)
     dataset_deque.extend(pk_lst)
     has_data_event.set()
 
@@ -273,12 +287,8 @@ def capture_live_packets(network_interface):
         lastpk_time = now
         now = time.time()
         if STOP_CAPTURE == False:
-            try:
-                pk_thrd = Thread(target=packet_to_lists,args=(raw_packet,start_time,lastpk_time,now),daemon=True,name='FeT')
-                pk_thrd.start()
-            except:
-                traceback.print_exc()
-                print(raw_packet)
+            pk_thrd = Thread(target=packet_to_lists,args=(raw_packet,start_time,lastpk_time,now),daemon=True,name='FeT')
+            pk_thrd.start()
         else:
             break
         pk_count+=1

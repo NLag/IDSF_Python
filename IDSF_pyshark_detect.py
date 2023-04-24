@@ -32,13 +32,26 @@ has_result_event = threading.Event()
 dtime_str = datetime.now().strftime('%d-%m-%Y_%H%M')
 
 # AI model
+#['DT','LSVC','Neural','RF','SGDC','XGBoost']
 modelfile = 'IDSF_model'
 filetype = '.joblib'
-modelname = 'LSVC'
+modelname = 'All_XGB_tuned'
 filename = modelfile + '_'+ modelname + filetype
-loaded_model = joblib.load(filename)
 
-csvfile = modelfolder +modelname+'_' +'result'+dtime_str+'.csv'
+tmpname = modelfile+'_DT'+ filetype
+loaded_model_DT = joblib.load(tmpname)
+tmpname = modelfile+'_LSVC'+ filetype
+loaded_model_LSVC = joblib.load(tmpname)
+tmpname = modelfile+'_Neural'+ filetype
+loaded_model_Neural = joblib.load(tmpname)
+tmpname = modelfile+'_RF'+ filetype
+loaded_model_RF = joblib.load(tmpname)
+tmpname = modelfile+'_SGDC'+ filetype
+loaded_model_SGDC = joblib.load(tmpname)
+tmpname = modelfile+'_XGBoost_tuned'+ filetype
+loaded_model_XGBoost = joblib.load(tmpname)
+
+csvfile = modelfolder +modelname+'_' +'result_'+dtime_str+'.csv'
 
 #stop signal and stop ack
 STOP_CAPTURE = False
@@ -49,11 +62,23 @@ pk_count = 0
 ###############################################################################
 
 def use_AI_model_detect_single_row(lstX):
-    global loaded_model
+    global loaded_model_DT
+    global loaded_model_LSVC
+    global loaded_model_Neural
+    global loaded_model_RF
+    global loaded_model_SGDC
+    global loaded_model_XGBoost
     global feature_name
     Xdf = pd.DataFrame([lstX],columns=feature_name)
-    lstY = loaded_model.predict(Xdf)
-    return lstY[0]
+    if len(Xdf) != 1:
+        print('More than 1 row!')
+    lstY_DT = loaded_model_DT.predict(Xdf)
+    lstY_LSVC = loaded_model_LSVC.predict(Xdf)
+    lstY_Neural = loaded_model_Neural.predict(Xdf)
+    lstY_RF = loaded_model_RF.predict(Xdf)
+    lstY_SGDC = loaded_model_SGDC.predict(Xdf)
+    lstY_XGBoost = loaded_model_XGBoost.predict(Xdf)
+    return [lstY_DT[0],lstY_LSVC[0],lstY_Neural[0],lstY_RF[0],lstY_SGDC[0],lstY_XGBoost[0]]
 
 #packet to list
 def packet_to_lists(pk,time_start,time_previous,time_now):
@@ -94,8 +119,9 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
     ft_lst[ft_dict['tcp.time_delta']]=float(pk.tcp.time_delta)
     if ("MQTT" not in pk):
         detect_r = use_AI_model_detect_single_row(ft_lst)
-        result_deque.append((true_r,detect_r))
-        return 0
+        detect_r.append(true_r)
+        res_lst.append(detect_r)
+        return 
     
     #MQTT
     # ['hdrflags', 'msgtype', 'len']
@@ -110,7 +136,8 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
         new_ft_lst[ft_dict['mqtt.len']]=int(mqtt.len)
         if len(mqtt.field_names) == 4:
             detect_r = use_AI_model_detect_single_row(new_ft_lst)
-            res_lst.append((true_r,detect_r))
+            detect_r.append(true_r)
+            res_lst.append(detect_r)
             continue
         try:
             if new_ft_lst[ft_dict['mqtt.msgtype']] == 1:
@@ -120,8 +147,8 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
                 # 'kalive', 'clientid_len', 'clientid', 'willtopic_len', 'willtopic', 'willmsg_len', 'willmsg'
                 # , 'username_len', 'username', 'passwd_len', 'passwd']
                 new_ft_lst[ft_dict['mqtt.proto_len']]=int(mqtt.proto_len)
-                # if new_ft_lst[ft_dict['mqtt.proto_len']] > new_ft_lst[ft_dict['mqtt.len']]:
-                #     continue
+                if new_ft_lst[ft_dict['mqtt.proto_len']] > new_ft_lst[ft_dict['mqtt.len']]:
+                    continue
                 if 'protoname' in mqtt.field_names:
                     new_ft_lst[ft_dict['mqtt.protoname']]=1 if 'MQTT' in str(mqtt.protoname) else 0
                 if 'ver' in mqtt.field_names:
@@ -207,7 +234,8 @@ def packet_to_lists(pk,time_start,time_previous,time_now):
             #     #pk_lstMQTT Reserved
         
             detect_r = use_AI_model_detect_single_row(new_ft_lst)
-            res_lst.append((true_r,detect_r))
+            detect_r.append(true_r)
+            res_lst.append(detect_r)
         except Exception as e:
             print(mqtt.field_names)
             traceback.print_exc()
